@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#020205">
+    <title>FUSEKILL</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #020205;
+            --neon-cyan: #00f3ff;
+            --neon-pink: #ff00ff;
+            --neon-purple: #9d00ff;
+            --glass: rgba(255, 255, 255, 0.03);
+        }
+        body {
+            margin: 0; padding: 0; background: var(--bg); color: #fff;
+            font-family: 'Orbitron', 'Segoe UI', sans-serif;
+            display: flex; flex-direction: column; align-items: center;
+            justify-content: flex-start; height: 100vh; overflow: hidden;
+            touch-action: none;
+        }
+        #bg-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; opacity: 0.5; }
+        #ui-header {
+            width: 95vw; max-width: 500px; display: flex; justify-content: space-between;
+            align-items: center; margin: 15px 0 10px 0; padding: 10px 20px;
+            background: var(--glass); backdrop-filter: blur(10px); border-radius: 15px;
+            border: 1px solid rgba(157, 0, 255, 0.2); z-index: 10;
+        }
+        .score-box { text-align: center; min-width: 80px; }
+        .label { font-size: 10px; color: var(--neon-pink); text-transform: uppercase; letter-spacing: 1px; }
+        .val { font-weight: bold; font-family: 'Courier New', monospace; font-size: 20px; color: var(--neon-cyan); text-shadow: 0 0 10px var(--neon-cyan); }
+        h1 { font-size: 18px; color: var(--neon-cyan); margin: 0; text-shadow: 0 0 15px var(--neon-cyan); letter-spacing: 2px; animation: pulse 2s infinite alternate; }
+        
+        #game-wrapper {
+            position: relative; width: 95vw; max-width: 500px; flex: 1; margin-bottom: 15px;
+        }
+        #game-container {
+            position: relative; border: 2px solid var(--neon-purple); border-radius: 20px;
+            overflow: hidden; background: rgba(10, 10, 15, 0.8);
+            box-shadow: 0 0 50px rgba(157, 0, 255, 0.3); width: 100%; height: 100%;
+        }
+        canvas { display: block; width: 100%; height: 100%; object-fit: contain; pointer-events: auto; }
+
+        /* Кнопка MENU */
+        #menu-btn {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            z-index: 9999;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border: 2px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            padding: 10px 20px;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-size: 14px;
+            display: none;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.5);
+            pointer-events: auto;
+        }
+        #menu-btn:hover {
+            background: var(--neon-cyan);
+            color: #000;
+        }
+
+        /* Модальные окна с хорошим скроллом */
+        .modal {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.92); backdrop-filter: blur(15px); display: none;
+            flex-direction: column; align-items: center;
+            z-index: 10000; animation: fadeIn 0.6s;
+            pointer-events: auto; overflow-y: auto;
+            padding: 15px 0;
+            box-sizing: border-box;
+        }
+        .modal-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 90%;
+            max-width: 380px;
+            gap: 18px;
+            padding-top: 50px;
+            padding-bottom: 30px;
+        }
+        .modal-header {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            font-size: 36px;
+            color: var(--neon-cyan);
+            cursor: pointer;
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid var(--neon-cyan);
+            border-radius: 50%;
+            box-shadow: 0 0 15px rgba(0,243,255,0.5);
+        }
+        .modal-header:hover {
+            background: var(--neon-cyan);
+            color: #000;
+        }
+        .modal h2 {
+            font-size: 28px;
+            color: var(--neon-cyan);
+            text-shadow: 0 0 25px var(--neon-cyan);
+            margin: 0;
+            text-align: center;
+        }
+        .modal p {
+            color: #aaa;
+            margin: 0 0 15px 0;
+            font-size: 16px;
+            text-align: center;
+            max-width: 85%;
+            line-height: 1.4;
+        }
+
+        /* Компактные кнопки */
+        .btn {
+            background: transparent;
+            border: 2px solid var(--neon-cyan);
+            color: var(--neon-cyan);
+            padding: 14px 40px;
+            border-radius: 12px;
+            font-weight: bold;
+            cursor: pointer;
+            text-transform: uppercase;
+            margin: 6px 0;
+            transition: 0.3s;
+            letter-spacing: 1.5px;
+            width: 100%;
+            max-width: 320px;
+            font-size: 17px;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+            pointer-events: auto;
+            box-sizing: border-box;
+        }
+        .btn:hover {
+            background: var(--neon-cyan);
+            color: #000;
+            box-shadow: 0 0 40px var(--neon-cyan);
+        }
+        .btn:active {
+            transform: scale(0.96);
+        }
+        .btn.secondary {
+            border-color: var(--neon-pink);
+            color: var(--neon-pink);
+            box-shadow: 0 0 20px rgba(255, 0, 255, 0.4);
+        }
+        .btn.secondary:hover {
+            background: var(--neon-pink);
+            color: #000;
+        }
+        .btn.danger {
+            border-color: #ff003c;
+            color: #ff003c;
+            box-shadow: 0 0 20px rgba(255, 0, 60, 0.4);
+        }
+        .btn.danger:hover {
+            background: #ff003c;
+            color: #fff;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pulse { from { text-shadow: 0 0 15px var(--neon-cyan); } to { text-shadow: 0 0 25px var(--neon-cyan); } }
+    </style>
+</head>
+<body>
+    <canvas id="bg-canvas"></canvas>
+    
+    <div id="ui-header">
+        <div>
+            <h1>FUSEKILL</h1>
+            <div id="subtitle" style="font-size: 8px; color: var(--neon-pink); letter-spacing: 3px;">PHYSICS MERGE</div>
+        </div>
+        <div style="display: flex; gap: 15px;">
+            <div class="score-box"><span class="label">DATA</span><div id="score" class="val">0</div></div>
+            <div class="score-box"><span class="label">MAX</span><div id="best" class="val">0</div></div>
+        </div>
+    </div>
+
+    <div id="game-wrapper">
+        <div id="game-container">
+            <div id="language-modal" class="modal">
+                <div class="modal-content">
+                    <h2>ВЫБЕРИТЕ ЯЗЫК</h2>
+                    <p>Выберите предпочитаемый язык</p>
+                    <button class="btn" data-lang="en">English</button>
+                    <button class="btn secondary" data-lang="ru">Русский</button>
+                    <button class="btn" data-lang="ko">한국어</button>
+                </div>
+            </div>
+
+            <div id="welcome-modal" class="modal">
+                <div class="modal-content">
+                    <h2>FUSEKILL</h2>
+                    <p>Удерживайте и двигайте для прицеливания<br>Отпустите, чтобы сбросить блок</p>
+                    <button id="welcome-start-btn" class="btn">НАЧАТЬ ИГРУ</button>
+                </div>
+            </div>
+
+            <div id="start-modal" class="modal">
+                <div class="modal-content">
+                    <h2>ДОБРО ПОЖАЛАВАТЬ</h2>
+                    <p>Обнаружено сохранённое состояние игры</p>
+                    <button id="continue-game-btn" class="btn">ПРОДОЛЖИТЬ ИГРУ</button>
+                    <button id="new-game-btn" class="btn secondary">НАЧАТЬ ЗАНОВО</button>
+                </div>
+            </div>
+
+            <div id="game-over" class="modal">
+                <div class="modal-content">
+                    <h2>ЯДРО РАСПЛАВИЛОСЬ</h2>
+                    <p>Обнаружено переполнение памяти</p>
+                    <button id="continue-after-loss-btn" class="btn">ПРОДОЛЖИТЬ ИЗ СОХРАНЕНИЯ</button>
+                    <button id="new-after-loss-btn" class="btn secondary">НОВАЯ ИГРА</button>
+                </div>
+            </div>
+
+            <div id="pause-modal" class="modal">
+                <div class="modal-content">
+                    <h2>ПАУЗА</h2>
+                    <p>Игра на паузе</p>
+                    <button id="resume-btn" class="btn">ПРОДОЛЖИТЬ</button>
+                    <button id="restart-btn" class="btn secondary">РЕСТАРТ</button>
+                    <button id="settings-btn" class="btn">НАСТРОЙКИ</button>
+                    <button id="main-menu-btn" class="btn danger">ГЛАВНОЕ МЕНЮ</button>
+                </div>
+            </div>
+
+            <div id="settings-modal" class="modal">
+                <div class="modal-header" id="settings-close">×</div>
+                <div class="modal-content">
+                    <h2>НАСТРОЙКИ</h2>
+                    <p>Управление звуком и вибрацией</p>
+                    <button id="toggle-sound-btn" class="btn">ЗВУК: ВКЛ</button>
+                    <button id="toggle-vibro-btn" class="btn secondary">ВИБРАЦИЯ: ВКЛ</button>
+                    <button id="toggle-theme-btn" class="btn">ТЕМА: НЕОН</button>
+                    <button id="back-to-pause-btn" class="btn danger">НАЗАД</button>
+                </div>
+            </div>
+        </div>
+
+        <button id="menu-btn">MENU</button>
+    </div>
+
+    <script>
+        const { Engine, Render, Runner, Bodies, Composite, Events, Body, Vector } = Matter;
+
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        const audioCtx = new AudioCtx();
+
+        let soundEnabled = localStorage.getItem('sound_enabled') !== 'false';
+        let vibroEnabled = localStorage.getItem('vibro_enabled') !== 'false';
+        let currentTheme = localStorage.getItem('game_theme') || 'neon';
+
+        function updateThemeState(theme) {
+            currentTheme = theme;
+            localStorage.setItem('game_theme', theme);
+            const btn = document.getElementById('toggle-theme-btn');
+            if (btn) btn.textContent = translations[currentLang].theme + (theme === 'neon' ? translations[currentLang].neon : translations[currentLang].retro);
+            
+            if (theme === 'retro') {
+                document.documentElement.style.setProperty('--bg', '#2b0035');
+                document.documentElement.style.setProperty('--neon-cyan', '#ff00ff');
+                document.documentElement.style.setProperty('--neon-pink', '#00f3ff');
+                document.documentElement.style.setProperty('--neon-purple', '#ffbd00');
+            } else {
+                document.documentElement.style.setProperty('--bg', '#020205');
+                document.documentElement.style.setProperty('--neon-cyan', '#00f3ff');
+                document.documentElement.style.setProperty('--neon-pink', '#ff00ff');
+                document.documentElement.style.setProperty('--neon-purple', '#9d00ff');
+            }
+        }
+
+        function updateSoundState(enabled) {
+            soundEnabled = enabled;
+            localStorage.setItem('sound_enabled', enabled);
+            const btn = document.getElementById('toggle-sound-btn');
+            if (btn) btn.textContent = translations[currentLang].sound + (enabled ? translations[currentLang].on : translations[currentLang].off);
+        }
+
+        function updateVibroState(enabled) {
+            vibroEnabled = enabled;
+            localStorage.setItem('vibro_enabled', enabled);
+            const btn = document.getElementById('toggle-vibro-btn');
+            if (btn) btn.textContent = translations[currentLang].vibro + (enabled ? translations[currentLang].on : translations[currentLang].off);
+        }
+
+        const Sound = {
+            play(freq, type = 'sine', duration = 0.1, volume = 0.3) {
+                if (!soundEnabled) return;
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+                osc.connect(gain).connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            },
+            vibrate(pattern) {
+                if (vibroEnabled && 'vibrate' in navigator) navigator.vibrate(pattern);
+            },
+            merge(level) {
+                const baseFreq = 200 + level * 60;
+                this.play(baseFreq, 'triangle', 0.15, 0.45);
+                this.play(baseFreq * 1.5, 'sine', 0.2, 0.25);
+                this.vibrate([60, 40, 60]);
+            },
+            epic() {
+                this.play(800, 'sawtooth', 0.4, 0.5);
+                this.play(1200, 'triangle', 0.5, 0.4);
+                this.play(400, 'square', 0.6, 0.3);
+                this.vibrate([100, 50, 100, 50, 200]);
+            },
+            warning() {
+                this.play(120, 'triangle', 0.3, 0.25);
+                this.play(80, 'sine', 0.5, 0.15);
+            },
+            spawn() { this.play(800, 'sine', 0.08, 0.15); },
+            gameOver() {
+                this.play(300, 'sawtooth', 0.4, 0.5);
+                this.play(150, 'sawtooth', 0.6, 0.4);
+                this.vibrate(300);
+            },
+            newRecord() {
+                this.epic();
+                this.play(1600, 'sine', 0.3, 0.4);
+                this.vibrate([100, 50, 100, 50, 100, 50, 300]);
+            }
+        };
+
+        class GameParticle {
+            constructor(x, y, color) {
+                this.x = x; this.y = y; this.color = color;
+                this.vx = (Math.random() - 0.5) * 10;
+                this.vy = (Math.random() - 0.5) * 10 - 3;
+                this.life = 1.0; this.size = Math.random() * 5 + 4;
+            }
+            update() { this.x += this.vx; this.y += this.vy; this.vy += 0.2; this.life -= 0.018; }
+            draw(ctx) {
+                ctx.save(); ctx.globalAlpha = this.life; ctx.fillStyle = this.color;
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size * this.life, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+            }
+        }
+
+        const COLORS = {
+            2: '#00f3ff', 4: '#00d4ff', 8: '#7000ff', 16: '#9d00ff',
+            32: '#ff00ff', 64: '#ff00bc', 128: '#ff003c', 256: '#ffbd00',
+            512: '#fff200', 1024: '#00ff41', 2048: '#ffffff',
+            4096: '#ff00ff', 8192: '#00ffff', 16384: '#ffff00',
+            32768: '#ff0000', 65536: '#00ff00', 131072: '#0000ff'
+        };
+
+        const bgCanvas = document.getElementById('bg-canvas');
+        const bgCtx = bgCanvas.getContext('2d');
+        let particles = [];
+        function initBG() {
+            bgCanvas.width = window.innerWidth; bgCanvas.height = window.innerHeight;
+            const maxParticles = window.innerWidth < 600 ? 50 : 80;
+            particles = [];
+            for(let i = 0; i < maxParticles; i++) particles.push({
+                x: Math.random() * bgCanvas.width,
+                y: Math.random() * bgCanvas.height,
+                s: Math.random() * 2 + 1,
+                v: Math.random() * 0.5 + 0.3
+            });
+        }
+        function drawBG() {
+            bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+            
+            if (currentTheme === 'retro') {
+                // Ретро сетка
+                bgCtx.strokeStyle = 'rgba(255, 0, 255, 0.15)';
+                bgCtx.lineWidth = 1;
+                const step = 40;
+                const offset = (Date.now() / 50) % step;
+                
+                for (let x = 0; x < bgCanvas.width; x += step) {
+                    bgCtx.beginPath();
+                    bgCtx.moveTo(x, 0);
+                    bgCtx.lineTo(x, bgCanvas.height);
+                    bgCtx.stroke();
+                }
+                for (let y = offset; y < bgCanvas.height; y += step) {
+                    bgCtx.beginPath();
+                    bgCtx.moveTo(0, y);
+                    bgCtx.lineTo(bgCanvas.width, y);
+                    bgCtx.stroke();
+                }
+                
+                bgCtx.fillStyle = '#ff00ff';
+            } else {
+                bgCtx.fillStyle = '#00f3ff';
+            }
+
+            particles.forEach(p => {
+                bgCtx.globalAlpha = 0.6;
+                bgCtx.beginPath(); bgCtx.arc(p.x, p.y, p.s, 0, Math.PI * 2); bgCtx.fill();
+                p.y += p.v; if (p.y > bgCanvas.height) p.y = -10;
+            });
+            requestAnimationFrame(drawBG);
+        }
+        initBG(); drawBG();
+
+        let gameInstance = null;
+        let currentLang = localStorage.getItem('game_lang') || 'ru';
+
+        const translations = {
+            en: {
+                subtitle: "PHYSICS MERGE", data: "DATA", max: "MAX",
+                welcomeTitle: "FUSEKILL", welcomeText: "Hold and move to aim<br>Release to drop the block", welcomeBtn: "START GAME",
+                welcomeBack: "WELCOME BACK", savedFound: "A saved game state was found", continue: "CONTINUE GAME", newStart: "START NEW",
+                meltdown: "CORE MELTDOWN", overflow: "Memory Overflow Detected", continueSave: "CONTINUE FROM SAVE", newGame: "NEW GAME",
+                pauseTitle: "PAUSE", pauseText: "Game paused", resume: "RESUME", restart: "RESTART", mainMenu: "MAIN MENU",
+                settingsTitle: "SETTINGS", settingsText: "Manage sound and vibration", sound: "SOUND: ", vibro: "VIBRATION: ", theme: "THEME: ", back: "BACK",
+                on: "ON", off: "OFF", neon: "NEON", retro: "RETRO"
+            },
+            ru: {
+                subtitle: "PHYSICS MERGE", data: "DATA", max: "MAX",
+                welcomeTitle: "FUSEKILL", welcomeText: "Удерживайте и двигайте для прицеливания<br>Отпустите, чтобы сбросить блок", welcomeBtn: "НАЧАТЬ ИГРУ",
+                welcomeBack: "ДОБРО ПОЖАЛАВАТЬ", savedFound: "Обнаружено сохранённое состояние игры", continue: "ПРОДОЛЖИТЬ ИГРУ", newStart: "НАЧАТЬ ЗАНОВО",
+                meltdown: "ЯДРО РАСПЛАВИЛОСЬ", overflow: "Обнаружено переполнение памяти", continueSave: "ПРОДОЛЖИТЬ ИЗ СОХРАНЕНИЯ", newGame: "НОВАЯ ИГРА",
+                pauseTitle: "ПАУЗА", pauseText: "Игра на паузе", resume: "ПРОДОЛЖИТЬ", restart: "РЕСТАРТ", mainMenu: "ГЛАВНОЕ МЕНЮ",
+                settingsTitle: "НАСТРОЙКИ", settingsText: "Управление звуком и вибрацией", sound: "ЗВУК: ", vibro: "ВИБРАЦИЯ: ", theme: "ТЕМА: ", back: "НАЗАД",
+                on: "ВКЛ", off: "ВЫКЛ", neon: "НЕОН", retro: "РЕТРО"
+            },
+            ko: {
+                subtitle: "피직스 머지", data: "데이터", max: "최고",
+                welcomeTitle: "FUSEKILL", welcomeText: "길게 누르고 이동하여 조준<br>놓아서 블록 드롭", welcomeBtn: "게임 시작",
+                welcomeBack: "다시 오신 걸 환영합니다", savedFound: "저장된 게임 상태가 발견되었습니다", continue: "게임 계속하기", newStart: "새로 시작",
+                meltdown: "코어 멜트다운", overflow: "메모리 오버플로우 감지", continueSave: "저장된 상태에서 계속", newGame: "새 게임",
+                pauseTitle: "일си정지", pauseText: "게임이 일시정지되었습니다", resume: "계속하기", restart: "재시작", mainMenu: "메인 메뉴",
+                settingsTitle: "설정", settingsText: "소리 및 진동 관리", sound: "소리: ", vibro: "진동: ", theme: "테마: ", back: "뒤로",
+                on: "켜짐", off: "꺼짐", neon: "네온", retro: "레트로"
+            }
+        };
+
+        function applyLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('game_lang', lang);
+            document.documentElement.lang = lang === 'ko' ? 'ko' : lang;
+
+            document.querySelector('#subtitle').textContent = translations[lang].subtitle;
+            document.querySelectorAll('.label')[0].textContent = translations[lang].data;
+            document.querySelectorAll('.label')[1].textContent = translations[lang].max;
+
+            document.querySelector('#welcome-modal h2').innerHTML = translations[lang].welcomeTitle;
+            document.querySelector('#welcome-modal p').innerHTML = translations[lang].welcomeText;
+            document.getElementById('welcome-start-btn').textContent = translations[lang].welcomeBtn;
+
+            document.querySelector('#start-modal h2').textContent = translations[lang].welcomeBack;
+            document.querySelector('#start-modal p').textContent = translations[lang].savedFound;
+            document.getElementById('continue-game-btn').textContent = translations[lang].continue;
+            document.getElementById('new-game-btn').textContent = translations[lang].newStart;
+
+            document.querySelector('#game-over h2').textContent = translations[lang].meltdown;
+            document.querySelector('#game-over p').textContent = translations[lang].overflow;
+            document.getElementById('continue-after-loss-btn').textContent = translations[lang].continueSave;
+            document.getElementById('new-after-loss-btn').textContent = translations[lang].newGame;
+
+            document.querySelector('#pause-modal h2').textContent = translations[lang].pauseTitle;
+            document.querySelector('#pause-modal p').textContent = translations[lang].pauseText;
+            document.getElementById('resume-btn').textContent = translations[lang].resume;
+            document.getElementById('restart-btn').textContent = translations[lang].restart;
+            document.getElementById('main-menu-btn').textContent = translations[lang].mainMenu;
+
+            document.querySelector('#settings-modal h2').textContent = translations[lang].settingsTitle;
+            document.querySelector('#settings-modal p').textContent = translations[lang].settingsText;
+            document.getElementById('toggle-sound-btn').textContent = translations[lang].sound + (soundEnabled ? translations[lang].on : translations[lang].off);
+            document.getElementById('toggle-vibro-btn').textContent = translations[lang].vibro + (vibroEnabled ? translations[lang].on : translations[lang].off);
+            document.getElementById('toggle-theme-btn').textContent = translations[lang].theme + (currentTheme === 'neon' ? translations[lang].neon : translations[lang].retro);
+            document.getElementById('back-to-pause-btn').textContent = translations[lang].back;
+        }
+
+        function showMainMenu() {
+            destroyGame();
+            document.getElementById('menu-btn').style.display = 'none';
+            document.getElementById('pause-modal').style.display = 'none';
+            document.getElementById('settings-modal').style.display = 'none';
+            const hasSave = !!localStorage.getItem('crypto_ult_save');
+            if (hasSave) {
+                document.getElementById('start-modal').style.display = 'flex';
+            } else {
+                document.getElementById('welcome-modal').style.display = 'flex';
+            }
+        }
+
+        function showSettings() {
+            document.getElementById('pause-modal').style.display = 'none';
+            document.getElementById('settings-modal').style.display = 'flex';
+        }
+
+        function backToPause() {
+            document.getElementById('settings-modal').style.display = 'none';
+            document.getElementById('pause-modal').style.display = 'flex';
+        }
+
+        class UltimateGame {
+            constructor(loadSave = false) {
+                this.container = document.getElementById('game-container');
+                this.scoreEl = document.getElementById('score');
+                this.bestEl = document.getElementById('best');
+                this.gameOverScreen = document.getElementById('game-over');
+                this.pauseModal = document.getElementById('pause-modal');
+                this.settingsModal = document.getElementById('settings-modal');
+                this.menuBtn = document.getElementById('menu-btn');
+                
+                const isMobile = window.innerWidth < 600;
+                this.width = isMobile ? window.innerWidth * 0.95 : Math.min(window.innerWidth * 0.9, 500);
+                this.height = isMobile ? window.innerHeight * 0.78 : Math.min(window.innerHeight * 0.7, 700);
+                
+                this.score = 0;
+                this.best = parseInt(localStorage.getItem('crypto_ult_best') || '0');
+                this.bestEl.innerText = this.best;
+                
+                this.nextValue = 2;
+                this.isSpawning = false;
+                this.isHolding = false;
+                this.previewX = this.width / 2;
+                this.targetX = this.width / 2;
+                this.previewScale = 0;
+                this.previewBob = 0;
+                this.floatingTexts = [];
+                this.gameParticles = [];
+                this.displayedScore = 0;
+                this.comboCount = 0;
+                this.lastMergeTime = 0;
+                this.deathLineY = 120;
+                this.warningZoneY = 220;
+                this.gameOver = false;
+                this.gameOverTimer = null;
+                this.saveInterval = null;
+                this.isPaused = false;
+
+                this.warningPulseTime = 0;
+                this.deathLinePulse = 0;
+
+                this.initPhysics();
+
+                if (loadSave && this.loadGame()) {
+                    this.scoreEl.innerText = this.score;
+                    this.updateScore();
+                }
+
+                this.render = Render.create({
+                    element: this.container,
+                    engine: this.engine,
+                    options: {
+                        width: this.width,
+                        height: this.height,
+                        wireframes: false,
+                        background: 'transparent',
+                        showVelocity: false
+                    }
+                });
+
+                Render.run(this.render);
+                this.runner = Runner.create();
+                Runner.run(this.runner, this.engine);
+
+                this.setupEvents();
+                this.saveInterval = setInterval(() => this.saveGame(), 5000);
+
+                this.menuBtn.style.display = 'block';
+            }
+
+            pause() {
+                if (this.isPaused || this.gameOver) return;
+                this.isPaused = true;
+                Runner.stop(this.runner);
+                this.pauseModal.style.display = 'flex';
+            }
+
+            resume() {
+                if (!this.isPaused) return;
+                this.isPaused = false;
+                Runner.run(this.runner, this.engine);
+                this.pauseModal.style.display = 'none';
+            }
+
+            initPhysics() {
+                this.engine = Engine.create();
+                this.engine.gravity.y = 0.8;
+
+                const walls = [
+                    Bodies.rectangle(this.width / 2, this.height + 30, this.width, 60, { isStatic: true, label: 'wall' }),
+                    Bodies.rectangle(-30, this.height / 2, 60, this.height, { isStatic: true, label: 'wall' }),
+                    Bodies.rectangle(this.width + 30, this.height / 2, 60, this.height, { isStatic: true, label: 'wall' })
+                ];
+                Composite.add(this.engine.world, walls);
+
+                Events.on(this.engine, 'collisionStart', event => {
+                    const pairs = event.pairs;
+                    for (const pair of pairs) {
+                        const { bodyA, bodyB } = pair;
+                        if (bodyA.label === 'cube' && bodyB.label === 'cube' && bodyA.value === bodyB.value) {
+                            // Эффект притяжения перед мерджем
+                            const force = Vector.mult(Vector.normalise(Vector.sub(bodyA.position, bodyB.position)), 0.05);
+                            Body.applyForce(bodyB, bodyB.position, force);
+                            Body.applyForce(bodyA, bodyA.position, Vector.neg(force));
+                            this.handleMerge(bodyA, bodyB);
+                        }
+                    }
+                });
+            }
+
+            loadGame() {
+                const save = localStorage.getItem('crypto_ult_save');
+                if (!save) return false;
+                try {
+                    const data = JSON.parse(save);
+                    if (data.version !== 1) return false;
+
+                    this.score = data.score || 0;
+                    this.nextValue = data.nextValue || 2;
+
+                    Composite.allBodies(this.engine.world).forEach(b => {
+                        if (b.label === 'cube') Composite.remove(this.engine.world, b);
+                    });
+
+                    data.bodies.forEach(b => {
+                        const size = Math.min(45 + (Math.log2(b.value) * 3.2), 120);
+                        const body = Bodies.rectangle(b.position.x, b.position.y, size, size, {
+                            restitution: 0.65,
+                            friction: 0.12,
+                            chamfer: { radius: 14 },
+                            label: 'cube',
+                            value: b.value,
+                            render: { fillStyle: COLORS[b.value] || '#ffffff', strokeStyle: '#fff', lineWidth: 4 }
+                        });
+                        body.squash = { x: 1, y: 1, vx: 0, vy: 0, angle: 0 };
+                        body.render.text = { content: b.value.toString(), size: size * 0.45 };
+                        Body.setVelocity(body, b.velocity);
+                        Body.setAngle(body, b.angle);
+                        Composite.add(this.engine.world, body);
+                    });
+
+                    return true;
+                } catch (e) {
+                    localStorage.removeItem('crypto_ult_save');
+                    return false;
+                }
+            }
+
+            saveGame() {
+                if (this.gameOver || this.isPaused) return;
+                const bodies = Composite.allBodies(this.engine.world)
+                    .filter(b => b.label === 'cube' && !b.isStatic)
+                    .map(b => ({
+                        position: b.position,
+                        value: b.value,
+                        velocity: b.velocity,
+                        angle: b.angle
+                    }));
+
+                const saveData = {
+                    version: 1,
+                    score: this.score,
+                    nextValue: this.nextValue,
+                    bodies
+                };
+                localStorage.setItem('crypto_ult_save', JSON.stringify(saveData));
+            }
+
+            spawnCube() {
+                if (this.isSpawning || this.gameOver || this.isPaused) return;
+                this.isSpawning = true;
+                Sound.spawn();
+
+                const size = Math.min(45 + (Math.log2(this.nextValue) * 3.2), 120);
+                const cube = Bodies.rectangle(this.previewX, 40, size, size, {
+                    restitution: 0.65,
+                    friction: 0.12,
+                    chamfer: { radius: 14 },
+                    label: 'cube',
+                    value: this.nextValue,
+                    render: { fillStyle: COLORS[this.nextValue] || '#ffffff', strokeStyle: '#fff', lineWidth: 4 }
+                });
+                cube.squash = { x: 1.8, y: 0.3, vx: 0, vy: 0, angle: Math.random() * Math.PI };
+                cube.render.text = { content: this.nextValue.toString(), size: size * 0.45 };
+                Composite.add(this.engine.world, cube);
+
+                const rand = Math.random();
+                const progFactor = Math.min(this.score / 10000, 1);
+                if (rand < 0.60 + progFactor * 0.1) this.nextValue = 2;
+                else if (rand < 0.85 + progFactor * 0.05) this.nextValue = 4;
+                else if (rand < 0.95 + progFactor * 0.02) this.nextValue = 8;
+                else if (rand < 0.99) this.nextValue = 16;
+                else this.nextValue = 32;
+
+                this.previewScale = 0;
+                this.isSpawning = false;
+            }
+
+            handleMerge(bodyA, bodyB) {
+                if (bodyA.isMerged || bodyB.isMerged) return;
+                bodyA.isMerged = true; bodyB.isMerged = true;
+
+                const newValue = bodyA.value * 2;
+                const newX = (bodyA.position.x + bodyB.position.x) / 2;
+                const newY = (bodyA.position.y + bodyB.position.y) / 2;
+
+                const now = Date.now();
+                if (now - this.lastMergeTime < 1500) {
+                    this.comboCount++;
+                } else {
+                    this.comboCount = 1;
+                }
+                this.lastMergeTime = now;
+
+                const comboBonus = Math.floor(newValue * (this.comboCount - 1) * 0.1);
+                const totalPoints = newValue + comboBonus;
+                this.score += totalPoints;
+                
+                let floatingMsg = '+' + totalPoints;
+                if (this.comboCount > 1) floatingMsg += ` (x${this.comboCount})`;
+                this.addFloatingText(newX, newY - 40, floatingMsg, COLORS[newValue] || '#fff');
+                Sound.merge(Math.log2(newValue) + (this.comboCount * 0.5));
+
+                if (newValue >= 4096) {
+                    Sound.epic();
+                    this.createGameParticles(newX, newY, '#ffffff', 120);
+                    this.createGameParticles(newX, newY, '#ff00ff', 80);
+                    document.body.style.animation = 'shake 0.6s';
+                    setTimeout(() => document.body.style.animation = '', 600);
+                } else if (newValue >= 2048) {
+                    Sound.epic();
+                    this.createGameParticles(newX, newY, '#ffffff', 80);
+                }
+
+                const fallingBody = Math.abs(bodyA.velocity.y) > Math.abs(bodyB.velocity.y) ? bodyA : bodyB;
+                const fallingVelocity = { x: fallingBody.velocity.x, y: fallingBody.velocity.y };
+
+                Composite.allBodies(this.engine.world).forEach(b => {
+                    if (b.label === 'cube' && b !== bodyA && b !== bodyB) {
+                        const distVec = Vector.sub(b.position, {x: newX, y: newY});
+                        const dist = Vector.magnitude(distVec);
+                        if (dist < 260) {
+                            const forceMagnitude = 0.15 * (1 - dist / 260);
+                            const force = Vector.mult(Vector.normalise(distVec), forceMagnitude);
+                            Body.applyForce(b, b.position, force);
+                        }
+                    }
+                });
+
+                Composite.remove(this.engine.world, [bodyA, bodyB]);
+
+                const size = Math.min(45 + (Math.log2(newValue) * 3.2), 120);
+                const merged = Bodies.rectangle(newX, newY, size, size, {
+                    restitution: 0.65,
+                    friction: 0.12,
+                    chamfer: { radius: 14 },
+                    label: 'cube',
+                    value: newValue,
+                    render: { fillStyle: COLORS[newValue] || '#ffffff', strokeStyle: '#fff', lineWidth: 4 }
+                });
+                merged.squash = { x: 1.8, y: 0.3, vx: 0, vy: 0, angle: 0 };
+                merged.render.text = { content: newValue.toString(), size: size * 0.45 };
+
+                Body.setVelocity(merged, { x: fallingVelocity.x * 0.7, y: fallingVelocity.y * 0.7 });
+                Composite.add(this.engine.world, merged);
+
+                this.updateScore();
+                this.saveGame();
+            }
+
+            addFloatingText(x, y, text, color) {
+                this.floatingTexts.push({ x, y, text, color, life: 1.8, vy: -2.5 });
+            }
+
+            updateScore() {
+                const isNewRecord = this.score > this.best;
+                if (isNewRecord) {
+                    this.best = this.score;
+                    this.bestEl.innerText = this.best;
+                    localStorage.setItem('crypto_ult_best', this.best);
+                    this.bestEl.style.color = '#ff00ff';
+                    this.bestEl.style.textShadow = '0 0 40px #ff00ff';
+                    Sound.newRecord();
+                    this.addFloatingText(this.width / 2, 100, 'NEW RECORD!', '#ff00ff');
+                    setTimeout(() => {
+                        this.bestEl.style.color = '';
+                        this.bestEl.style.textShadow = '';
+                    }, 4000);
+                }
+            }
+
+            checkWarningAndGameOver() {
+                if (this.gameOver || this.isPaused) return;
+
+                const bodies = Composite.allBodies(this.engine.world);
+                let nearDeath = false;
+                let highestY = this.height;
+
+                for (const body of bodies) {
+                    if (body.label === 'cube' && !body.isStatic) {
+                        highestY = Math.min(highestY, body.position.y - (body.bounds.max.y - body.bounds.min.y) / 2);
+                        if (body.position.y < this.warningZoneY) nearDeath = true;
+                    }
+                }
+
+                const distanceToLine = this.deathLineY - highestY;
+                this.deathLinePulse = Math.max(0, (150 - distanceToLine) / 150);
+
+                if (nearDeath) {
+                    const now = Date.now();
+                    const intensity = this.deathLinePulse;
+                    const pulseInterval = 1400 - intensity * 1100;
+                    if (now - this.warningPulseTime > pulseInterval) {
+                        Sound.warning();
+                        this.warningPulseTime = now;
+                    }
+                }
+
+                let isOverCondition = false;
+                for (const body of bodies) {
+                    if (body.label === 'cube' && !body.isStatic) {
+                        if (body.position.y < this.deathLineY && Math.abs(body.velocity.y) < 0.15 && !this.isSpawning) {
+                            isOverCondition = true;
+                        }
+                    }
+                }
+
+                if (isOverCondition) {
+                    if (!this.gameOverTimer) this.gameOverTimer = Date.now();
+                    if (Date.now() - this.gameOverTimer > 3000) {
+                        this.gameOver = true;
+                        Sound.gameOver();
+                        clearInterval(this.saveInterval);
+
+                        const hasSave = !!localStorage.getItem('crypto_ult_save');
+                        document.getElementById('continue-after-loss-btn').style.display = hasSave ? 'block' : 'none';
+
+                        this.gameOverScreen.style.display = 'flex';
+                        this.menuBtn.style.display = 'none';
+                    }
+                } else {
+                    this.gameOverTimer = null;
+                }
+            }
+
+            createGameParticles(x, y, color, count) {
+                for (let i = 0; i < count; i++) {
+                    this.gameParticles.push(new GameParticle(x, y, color));
+                }
+            }
+
+            setupEvents() {
+                const canvas = this.render.canvas;
+                const updatePos = (e) => {
+                    e.preventDefault();
+                    const rect = canvas.getBoundingClientRect();
+                    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+                    this.targetX = Math.max(40, Math.min(x, this.width - 40));
+                };
+
+                canvas.addEventListener('mousemove', updatePos, { passive: false });
+                canvas.addEventListener('touchmove', updatePos, { passive: false });
+                
+                canvas.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    updatePos(e);
+                    this.isHolding = true;
+                }, { passive: false });
+
+                canvas.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    updatePos(e);
+                    this.isHolding = true;
+                }, { passive: false });
+
+                const handleRelease = (e) => {
+                    e.preventDefault();
+                    if (this.isHolding) {
+                        this.spawnCube();
+                        this.isHolding = false;
+                    }
+                };
+
+                window.addEventListener('mouseup', handleRelease, { passive: false });
+                window.addEventListener('touchend', handleRelease, { passive: false });
+
+                this.menuBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.pause();
+                });
+                this.menuBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    this.pause();
+                });
+
+                const resumeBtn = document.getElementById('resume-btn');
+                resumeBtn.addEventListener('click', (e) => { e.preventDefault(); this.resume(); });
+                resumeBtn.addEventListener('touchstart', (e) => { e.preventDefault(); this.resume(); });
+
+                const restartBtn = document.getElementById('restart-btn');
+                restartBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    localStorage.removeItem('crypto_ult_save');
+                    this.pauseModal.style.display = 'none';
+                    startGame(false);
+                });
+                restartBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    localStorage.removeItem('crypto_ult_save');
+                    this.pauseModal.style.display = 'none';
+                    startGame(false);
+                });
+
+                const settingsBtn = document.getElementById('settings-btn');
+                settingsBtn.addEventListener('click', (e) => { e.preventDefault(); showSettings(); });
+                settingsBtn.addEventListener('touchstart', (e) => { e.preventDefault(); showSettings(); });
+
+                const backToPauseBtn = document.getElementById('back-to-pause-btn');
+                backToPauseBtn.addEventListener('click', (e) => { e.preventDefault(); backToPause(); });
+                backToPauseBtn.addEventListener('touchstart', (e) => { e.preventDefault(); backToPause(); });
+
+                const toggleSoundBtn = document.getElementById('toggle-sound-btn');
+                toggleSoundBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    updateSoundState(!soundEnabled);
+                });
+                toggleSoundBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    updateSoundState(!soundEnabled);
+                });
+
+                const toggleVibroBtn = document.getElementById('toggle-vibro-btn');
+                toggleVibroBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    updateVibroState(!vibroEnabled);
+                });
+                toggleVibroBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    updateVibroState(!vibroEnabled);
+                });
+
+                const toggleThemeBtn = document.getElementById('toggle-theme-btn');
+                toggleThemeBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    updateThemeState(currentTheme === 'neon' ? 'retro' : 'neon');
+                });
+                toggleThemeBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    updateThemeState(currentTheme === 'neon' ? 'retro' : 'neon');
+                });
+
+                const mainMenuBtn = document.getElementById('main-menu-btn');
+                mainMenuBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.pauseModal.style.display = 'none';
+                    showMainMenu();
+                });
+                mainMenuBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    this.pauseModal.style.display = 'none';
+                    showMainMenu();
+                });
+
+                const settingsClose = document.getElementById('settings-close');
+                settingsClose.addEventListener('click', (e) => { e.preventDefault(); backToPause(); });
+                settingsClose.addEventListener('touchstart', (e) => { e.preventDefault(); backToPause(); });
+
+                Events.on(this.render, 'afterRender', () => {
+                    if (this.isPaused) return;
+
+                    const ctx = this.render.context;
+                    this.previewX += (this.targetX - this.previewX) * 0.2;
+                    this.previewBob += 0.08;
+
+                    if (this.previewScale < 1) {
+                        this.previewScale = Math.min(1, this.previewScale + 0.1);
+                    }
+
+                    const pulseIntensity = 0.6 + 0.4 * this.deathLinePulse;
+                    const pulseSpeed = 180 - this.deathLinePulse * 100;
+                    ctx.strokeStyle = '#ff003c';
+                    ctx.globalAlpha = pulseIntensity + 0.5 * Math.sin(Date.now() / pulseSpeed);
+                    ctx.lineWidth = 5 + 3 * this.deathLinePulse;
+                    ctx.shadowBlur = 20;
+                    ctx.shadowColor = '#ff003c';
+                    ctx.setLineDash([12, 8]);
+                    ctx.beginPath();
+                    ctx.moveTo(0, this.deathLineY);
+                    ctx.lineTo(this.width, this.deathLineY);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.shadowBlur = 0;
+                    ctx.globalAlpha = 1;
+
+                    const pSize = this.isHolding ? 50 : 44;
+                    const bob = this.isHolding ? Math.sin(this.previewBob) * 4 : 0;
+                    const pulse = this.isHolding ? (1 + 0.06 * Math.sin(Date.now() / 80)) : 1;
+
+                    ctx.save();
+                    ctx.translate(this.previewX, 40 + bob);
+                    ctx.scale(pulse * this.previewScale, pulse * this.previewScale);
+                    ctx.shadowBlur = this.isHolding ? 50 : 30;
+                    ctx.shadowColor = COLORS[this.nextValue] || '#fff';
+                    ctx.fillStyle = COLORS[this.nextValue] || '#fff';
+                    ctx.beginPath();
+                    ctx.roundRect(-pSize/2, -pSize/2, pSize, pSize, 14);
+                    ctx.fill();
+                    ctx.fillStyle = (this.nextValue <= 4) ? '#000' : '#fff';
+                    ctx.font = 'bold 20px Orbitron';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.shadowBlur = 8;
+                    ctx.shadowColor = '#000';
+                    ctx.fillText(this.nextValue, 0, 2);
+                    ctx.restore();
+
+                    // Направляющая линия
+                    if (this.isHolding && !this.gameOver) {
+                        ctx.save();
+                        ctx.strokeStyle = COLORS[this.nextValue] || '#fff';
+                        ctx.setLineDash([5, 10]);
+                        ctx.globalAlpha = 0.3;
+                        ctx.lineWidth = 2;
+                        ctx.beginPath();
+                        ctx.moveTo(this.previewX, 60);
+                        ctx.lineTo(this.previewX, this.height);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+
+                    for (let i = this.floatingTexts.length - 1; i >= 0; i--) {
+                        const ft = this.floatingTexts[i];
+                        ft.y += ft.vy;
+                        ft.vy += 0.1;
+                        ft.life -= 0.012;
+                        if (ft.life <= 0) this.floatingTexts.splice(i, 1);
+                        else {
+                            ctx.save();
+                            ctx.globalAlpha = ft.life;
+                            ctx.fillStyle = ft.color;
+                            ctx.font = 'bold 28px Orbitron';
+                            ctx.textAlign = 'center';
+                            ctx.shadowBlur = 15;
+                            ctx.shadowColor = ft.color;
+                            ctx.fillText(ft.text, ft.x, ft.y);
+                            ctx.restore();
+                        }
+                    }
+
+                    if (this.displayedScore < this.score) {
+                        this.displayedScore += Math.ceil((this.score - this.displayedScore) * 0.15);
+                        this.scoreEl.innerText = this.displayedScore;
+                    } else if (this.displayedScore > this.score) {
+                        this.displayedScore = this.score;
+                        this.scoreEl.innerText = this.displayedScore;
+                    }
+
+                    if (this.gameParticles.length > 150) {
+                        this.gameParticles.splice(0, this.gameParticles.length - 150);
+                    }
+                    for (let i = this.gameParticles.length - 1; i >= 0; i--) {
+                        const p = this.gameParticles[i];
+                        p.update();
+                        if (p.life <= 0) this.gameParticles.splice(i, 1);
+                        else p.draw(ctx);
+                    }
+
+                    Composite.allBodies(this.engine.world).forEach(body => {
+                        if (body.label === 'cube' && body.squash) {
+                            const k = 0.28, d = 0.85;
+                            body.squash.vx += (1 - body.squash.x) * k;
+                            body.squash.vx *= d;
+                            body.squash.x += body.squash.vx;
+                            body.squash.y = 1 / body.squash.x;
+
+                            ctx.save();
+                            ctx.translate(body.position.x, body.position.y);
+                            ctx.rotate(body.angle);
+
+                            const size = Math.min(45 + (Math.log2(body.value) * 3.2), 120);
+                            const color = COLORS[body.value] || '#ffffff';
+
+                            ctx.scale(body.squash.x, body.squash.y);
+
+                            if (body.value >= 4096) {
+                                const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, size/2);
+                                grad.addColorStop(0, '#ffffff');
+                                grad.addColorStop(0.5, color);
+                                grad.addColorStop(1, '#ff00ff');
+                                ctx.fillStyle = grad;
+                            } else if (body.value >= 2048) {
+                                ctx.fillStyle = '#ffffff';
+                            } else {
+                                ctx.fillStyle = color;
+                            }
+
+                            ctx.shadowBlur = 20;
+                            ctx.shadowColor = color;
+                            ctx.beginPath();
+                            ctx.roundRect(-size/2, -size/2, size, size, 14);
+                            ctx.fill();
+                            ctx.shadowBlur = 0;
+
+                            const textSize = size * 0.45;
+                            const isDarkText = body.value <= 4;
+                            ctx.fillStyle = isDarkText ? '#000' : '#fff';
+                            ctx.font = `bold ${textSize}px Orbitron`;
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+
+                            ctx.strokeStyle = '#000';
+                            ctx.lineWidth = 6;
+                            ctx.strokeText(body.value.toString(), 0, 0);
+
+                            ctx.shadowColor = '#fff';
+                            ctx.shadowBlur = 10;
+                            ctx.fillText(body.value.toString(), 0, 0);
+
+                            ctx.restore();
+                        }
+                    });
+
+                    this.checkWarningAndGameOver();
+                });
+            }
+        }
+
+        function destroyGame() {
+            if (gameInstance) {
+                Render.stop(gameInstance.render);
+                if (gameInstance.runner) Runner.stop(gameInstance.runner);
+                Engine.clear(gameInstance.engine);
+                gameInstance.render.canvas.remove();
+                gameInstance.render.textures = {};
+                gameInstance = null;
+            }
+        }
+
+        function startGame(loadSave) {
+            destroyGame();
+            document.getElementById('pause-modal').style.display = 'none';
+            document.getElementById('settings-modal').style.display = 'none';
+            gameInstance = new UltimateGame(loadSave);
+        }
+
+        window.onload = () => {
+            const hasLang = localStorage.getItem('game_lang') !== null;
+            const hasSave = !!localStorage.getItem('crypto_ult_save');
+
+            if (!hasLang) {
+                document.getElementById('language-modal').style.display = 'flex';
+                document.querySelectorAll('#language-modal .btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        const lang = btn.getAttribute('data-lang');
+                        applyLanguage(lang);
+                        document.getElementById('language-modal').style.display = 'none';
+                        document.getElementById('welcome-modal').style.display = 'flex';
+                    });
+                    btn.addEventListener('touchstart', (e) => {
+                        e.preventDefault();
+                        const lang = btn.getAttribute('data-lang');
+                        applyLanguage(lang);
+                        document.getElementById('language-modal').style.display = 'none';
+                        document.getElementById('welcome-modal').style.display = 'flex';
+                    });
+                });
+            } else {
+                applyLanguage(currentLang);
+                updateThemeState(currentTheme);
+
+                if (hasSave) {
+                    document.getElementById('start-modal').style.display = 'flex';
+                } else {
+                    document.getElementById('welcome-modal').style.display = 'flex';
+                }
+            }
+
+            const addButtonHandlers = (id, handler) => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    btn.addEventListener('click', (e) => { e.preventDefault(); handler(); });
+                    btn.addEventListener('touchstart', (e) => { e.preventDefault(); handler(); });
+                }
+            };
+
+            addButtonHandlers('welcome-start-btn', () => {
+                document.getElementById('welcome-modal').style.display = 'none';
+                startGame(false);
+            });
+
+            addButtonHandlers('continue-game-btn', () => {
+                document.getElementById('start-modal').style.display = 'none';
+                startGame(true);
+            });
+
+            addButtonHandlers('new-game-btn', () => {
+                localStorage.removeItem('crypto_ult_save');
+                document.getElementById('start-modal').style.display = 'none';
+                startGame(false);
+            });
+
+            addButtonHandlers('continue-after-loss-btn', () => {
+                document.getElementById('game-over').style.display = 'none';
+                startGame(true);
+            });
+
+            addButtonHandlers('new-after-loss-btn', () => {
+                localStorage.removeItem('crypto_ult_save');
+                document.getElementById('game-over').style.display = 'none';
+                startGame(false);
+            });
+        };
+
+        window.onresize = () => {
+            initBG();
+            if (gameInstance) {
+                const loadSave = !!localStorage.getItem('crypto_ult_save');
+                startGame(loadSave);
+            }
+        };
+    </script>
+</body>
+</html>
